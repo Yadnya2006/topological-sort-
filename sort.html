@@ -1,0 +1,1168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Topological Sort Visualizer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .node {
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        .edge {
+            transition: all 0.3s ease;
+        }
+        .highlight {
+            animation: pulse 1s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+        .selected-node {
+            stroke: #f59e0b !important;
+            stroke-width: 4px !important;
+        }
+        .canvas-cursor-add {
+            cursor: crosshair;
+        }
+        .canvas-cursor-edge {
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen">
+    <div class="container mx-auto px-4 py-6">
+        <!-- Header -->
+        <div class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-gray-800 mb-2">Interactive Topological Sort Visualizer</h1>
+            <p class="text-gray-600">Click to create nodes, connect them, then run algorithms!</p>
+        </div>
+
+        <!-- Controls -->
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+            <div class="flex flex-wrap gap-4 items-center justify-center mb-4">
+                <button id="generateGraph" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium transition-colors">
+                    Random Graph
+                </button>
+                <select id="sampleGraphs" class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-lg font-medium transition-colors">
+                    <option value="">Sample Graphs</option>
+                    <option value="linear">Linear Chain</option>
+                    <option value="tree">Tree Structure</option>
+                    <option value="diamond">Diamond Pattern</option>
+                    <option value="complex">Complex DAG</option>
+                    <option value="course">Course Prerequisites</option>
+                </select>
+                <button id="interactiveMode" class="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg font-medium transition-colors">
+                    Interactive Mode
+                </button>
+                <button id="customGraph" class="bg-orange-600 hover:bg-orange-700 text-white px-6 py-2 rounded-lg font-medium transition-colors">
+                    Text Input Mode
+                </button>
+
+                <div class="flex items-center gap-2">
+                    <label class="text-gray-700 font-medium">Speed:</label>
+                    <input type="range" id="speedSlider" min="100" max="2000" value="800" class="w-24">
+                </div>
+            </div>
+            
+            <!-- Interactive Graph Editor -->
+            <div id="interactivePanel" class="hidden border-t pt-4">
+                <h3 class="text-lg font-semibold text-gray-800 mb-3">🎨 Interactive Graph Editor</h3>
+                <div class="bg-blue-50 rounded-lg p-4 mb-4">
+                    <div class="flex flex-wrap gap-3 items-center justify-center mb-3">
+                        <button id="addNodeMode" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors">
+                            ➕ Add Node Mode
+                        </button>
+                        <button id="addEdgeMode" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg font-medium transition-colors">
+                            🔗 Add Edge Mode
+                        </button>
+                        <button id="deleteMode" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-medium transition-colors">
+                            🗑️ Delete Mode
+                        </button>
+                        <button id="clearGraph" class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg font-medium transition-colors">
+                            Clear All
+                        </button>
+                        <button id="finishEditing" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium transition-colors">
+                            ✅ Finish Editing
+                        </button>
+                    </div>
+                    <div id="editorStatus" class="text-center text-sm font-medium text-gray-700 bg-white px-3 py-2 rounded">
+                        Click "Add Node Mode" then click anywhere on the canvas to add nodes
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Custom Graph Creator -->
+            <div id="customGraphPanel" class="hidden border-t pt-4">
+                <h3 class="text-lg font-semibold text-gray-800 mb-3">Create Your Own Graph</h3>
+                <div class="grid md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Nodes (comma-separated):</label>
+                        <input type="text" id="customNodes" placeholder="A, B, C, D, E" 
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Edges (format: A→B, C→D):</label>
+                        <input type="text" id="customEdges" placeholder="A→B, B→C, A→D" 
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                </div>
+                <div class="mt-3 flex gap-2">
+                    <button id="createCustomGraph" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium transition-colors">
+                        Create Graph
+                    </button>
+                    <button id="cancelCustomGraph" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg font-medium transition-colors">
+                        Cancel
+                    </button>
+                </div>
+                <div class="mt-2 text-sm text-gray-600">
+                    <strong>Tips:</strong> Use letters or numbers for nodes. For edges, use → or - to connect nodes (e.g., A→B or A-B).
+                </div>
+                <div id="errorMessage" class="hidden mt-3 p-3 bg-red-100 border border-red-400 text-red-700 rounded-lg">
+                    <strong>Error:</strong> <span id="errorText"></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Graph Visualization -->
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4 text-center">Graph Visualization</h2>
+            
+            <!-- Algorithm Run Controls -->
+            <div class="bg-gray-50 rounded-lg p-4 mb-6">
+                <div class="flex flex-wrap gap-3 items-center justify-center">
+                    <button id="runDFS" class="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg font-medium transition-colors">
+                        Run DFS Algorithm
+                    </button>
+                    <button id="stepDFS" class="bg-green-500 hover:bg-green-600 text-white px-6 py-2 rounded-lg font-medium transition-colors">
+                        Step DFS
+                    </button>
+                    <button id="runKahn" class="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded-lg font-medium transition-colors">
+                        Run Kahn's Algorithm
+                    </button>
+                    <button id="stepKahn" class="bg-purple-500 hover:bg-purple-600 text-white px-6 py-2 rounded-lg font-medium transition-colors">
+                        Step Kahn's
+                    </button>
+                    <button id="reset" class="bg-gray-600 hover:bg-gray-700 text-white px-6 py-2 rounded-lg font-medium transition-colors">
+                        Reset
+                    </button>
+                </div>
+            </div>
+            
+            <div class="flex justify-center overflow-x-auto">
+                <svg id="graphSvg" width="600" height="350" class="border border-gray-300 rounded-lg bg-gray-50">
+                    <text x="300" y="175" text-anchor="middle" class="text-gray-500 text-lg">Click "Interactive Mode" to start creating your graph!</text>
+                </svg>
+            </div>
+            <div class="mt-4 text-center">
+                <div class="inline-flex items-center gap-6 text-sm">
+                    <div class="flex items-center gap-2">
+                        <div class="w-4 h-4 bg-blue-500 rounded-full"></div>
+                        <span>Unvisited</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <div class="w-4 h-4 bg-yellow-500 rounded-full"></div>
+                        <span>Processing</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <div class="w-4 h-4 bg-green-500 rounded-full"></div>
+                        <span>Completed</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <div class="w-4 h-4 bg-orange-500 rounded-full border-2 border-orange-600"></div>
+                        <span>Selected</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Algorithm Panels -->
+        <div class="grid lg:grid-cols-2 gap-6">
+            <!-- DFS Panel -->
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <h2 class="text-2xl font-bold text-green-700 mb-4 text-center">DFS-based Topological Sort</h2>
+                <div class="mb-4">
+                    <h3 class="font-semibold text-gray-700 mb-2">Algorithm Steps:</h3>
+                    <div id="dfsSteps" class="text-sm text-gray-600 space-y-1">
+                        <div>1. Start DFS from any unvisited node</div>
+                        <div>2. Recursively visit all neighbors</div>
+                        <div>3. Add to result when backtracking</div>
+                        <div>4. Reverse the final result</div>
+                    </div>
+                </div>
+                <div class="mb-4">
+                    <h3 class="font-semibold text-gray-700 mb-2">Current Status:</h3>
+                    <div id="dfsStatus" class="text-sm bg-gray-100 p-2 rounded">Ready to start</div>
+                </div>
+                <div class="mb-4">
+                    <h3 class="font-semibold text-gray-700 mb-2">Result:</h3>
+                    <div id="dfsResult" class="text-lg font-mono bg-green-50 p-3 rounded border min-h-[50px] flex items-center">
+                        Create a graph first, then run DFS algorithm
+                    </div>
+                </div>
+            </div>
+
+            <!-- Kahn's Panel -->
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <h2 class="text-2xl font-bold text-purple-700 mb-4 text-center">Kahn's Algorithm</h2>
+                <div class="mb-4">
+                    <h3 class="font-semibold text-gray-700 mb-2">Algorithm Steps:</h3>
+                    <div id="kahnSteps" class="text-sm text-gray-600 space-y-1">
+                        <div>1. Pick a source [vertex with in-degree zero], output it</div>
+                        <div>2. Remove vertex and all edges out of it</div>
+                        <div>3. Repeat until graph is empty</div>
+                    </div>
+                </div>
+                <div class="mb-4">
+                    <h3 class="font-semibold text-gray-700 mb-2">Current Status:</h3>
+                    <div id="kahnStatus" class="text-sm bg-gray-100 p-2 rounded">Ready to start</div>
+                </div>
+                <div class="mb-4">
+                    <h3 class="font-semibold text-gray-700 mb-2">In-degrees:</h3>
+                    <div id="inDegrees" class="text-sm bg-gray-50 p-2 rounded font-mono">Create a graph first</div>
+                </div>
+                <div class="mb-4">
+                    <h3 class="font-semibold text-gray-700 mb-2">Result:</h3>
+                    <div id="kahnResult" class="text-lg font-mono bg-purple-50 p-3 rounded border min-h-[50px] flex items-center">
+                        Create a graph first, then run Kahn's algorithm
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class TopologicalSortVisualizer {
+            constructor() {
+                this.graph = {};
+                this.nodes = [];
+                this.edges = [];
+                this.nodePositions = {};
+                this.isRunning = false;
+                this.speed = 800;
+                this.nodeCounter = 1;
+                
+                // Interactive editing state
+                this.editMode = 'none'; // 'addNode', 'addEdge', 'delete'
+                this.selectedNode = null;
+                this.isInteractiveMode = false;
+                
+                // Step-by-step execution state
+                this.dfsState = null;
+                this.kahnState = null;
+                
+                this.initializeEventListeners();
+                this.clearCanvas();
+            }
+
+            initializeEventListeners() {
+                document.getElementById('generateGraph').addEventListener('click', () => this.generateRandomGraph());
+                document.getElementById('sampleGraphs').addEventListener('change', (e) => this.loadSampleGraph(e.target.value));
+                document.getElementById('interactiveMode').addEventListener('click', () => this.toggleInteractiveMode());
+                document.getElementById('customGraph').addEventListener('click', () => this.toggleCustomGraphPanel());
+                document.getElementById('createCustomGraph').addEventListener('click', () => this.createCustomGraph());
+                document.getElementById('cancelCustomGraph').addEventListener('click', () => this.toggleCustomGraphPanel());
+                
+                // Interactive mode buttons
+                document.getElementById('addNodeMode').addEventListener('click', () => this.setEditMode('addNode'));
+                document.getElementById('addEdgeMode').addEventListener('click', () => this.setEditMode('addEdge'));
+                document.getElementById('deleteMode').addEventListener('click', () => this.setEditMode('delete'));
+                document.getElementById('clearGraph').addEventListener('click', () => this.clearInteractiveGraph());
+                document.getElementById('finishEditing').addEventListener('click', () => this.finishEditing());
+                
+                // Algorithm buttons
+                document.getElementById('runDFS').addEventListener('click', () => this.runDFSVisualization());
+                document.getElementById('stepDFS').addEventListener('click', () => this.stepDFSVisualization());
+                document.getElementById('runKahn').addEventListener('click', () => this.runKahnVisualization());
+                document.getElementById('stepKahn').addEventListener('click', () => this.stepKahnVisualization());
+                document.getElementById('reset').addEventListener('click', () => this.resetVisualization());
+                document.getElementById('speedSlider').addEventListener('input', (e) => {
+                    this.speed = 2100 - parseInt(e.target.value);
+                });
+
+                // Canvas click handler
+                document.getElementById('graphSvg').addEventListener('click', (e) => this.handleCanvasClick(e));
+            }
+
+            toggleInteractiveMode() {
+                this.isInteractiveMode = !this.isInteractiveMode;
+                const panel = document.getElementById('interactivePanel');
+                const button = document.getElementById('interactiveMode');
+                
+                if (this.isInteractiveMode) {
+                    panel.classList.remove('hidden');
+                    button.textContent = '🎨 Exit Interactive Mode';
+                    button.classList.remove('bg-green-600', 'hover:bg-green-700');
+                    button.classList.add('bg-red-600', 'hover:bg-red-700');
+                    this.clearCanvas();
+                    this.setEditMode('addNode');
+                } else {
+                    panel.classList.add('hidden');
+                    button.textContent = 'Interactive Mode';
+                    button.classList.remove('bg-red-600', 'hover:bg-red-700');
+                    button.classList.add('bg-green-600', 'hover:bg-green-700');
+                    this.setEditMode('none');
+                }
+            }
+
+            setEditMode(mode) {
+                this.editMode = mode;
+                this.selectedNode = null;
+                this.clearNodeSelections();
+                
+                const svg = document.getElementById('graphSvg');
+                const status = document.getElementById('editorStatus');
+                
+                // Update button states
+                document.querySelectorAll('#interactivePanel button').forEach(btn => {
+                    btn.classList.remove('ring-2', 'ring-yellow-400');
+                });
+                
+                switch(mode) {
+                    case 'addNode':
+                        document.getElementById('addNodeMode').classList.add('ring-2', 'ring-yellow-400');
+                        svg.classList.add('canvas-cursor-add');
+                        svg.classList.remove('canvas-cursor-edge');
+                        status.textContent = '➕ Click anywhere on the canvas to add a new node';
+                        break;
+                    case 'addEdge':
+                        document.getElementById('addEdgeMode').classList.add('ring-2', 'ring-yellow-400');
+                        svg.classList.add('canvas-cursor-edge');
+                        svg.classList.remove('canvas-cursor-add');
+                        status.textContent = '🔗 Click on two nodes to create an edge between them';
+                        break;
+                    case 'delete':
+                        document.getElementById('deleteMode').classList.add('ring-2', 'ring-yellow-400');
+                        svg.classList.remove('canvas-cursor-add', 'canvas-cursor-edge');
+                        status.textContent = '🗑️ Click on nodes or edges to delete them';
+                        break;
+                    default:
+                        svg.classList.remove('canvas-cursor-add', 'canvas-cursor-edge');
+                        status.textContent = 'Select a mode to start editing your graph';
+                }
+            }
+
+            handleCanvasClick(e) {
+                if (!this.isInteractiveMode || this.isRunning) return;
+                
+                const svg = document.getElementById('graphSvg');
+                const rect = svg.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                
+                // Check if clicked on a node
+                const clickedNode = this.getNodeAtPosition(x, y);
+                
+                if (this.editMode === 'addNode' && !clickedNode) {
+                    this.addNodeAtPosition(x, y);
+                } else if (this.editMode === 'addEdge' && clickedNode) {
+                    this.handleEdgeCreation(clickedNode);
+                } else if (this.editMode === 'delete' && clickedNode) {
+                    this.deleteNode(clickedNode);
+                }
+            }
+
+            getNodeAtPosition(x, y) {
+                for (const node of this.nodes) {
+                    const pos = this.nodePositions[node];
+                    const distance = Math.sqrt((x - pos.x) ** 2 + (y - pos.y) ** 2);
+                    if (distance <= 30) { // Node radius
+                        return node;
+                    }
+                }
+                return null;
+            }
+
+            addNodeAtPosition(x, y) {
+                const nodeName = String.fromCharCode(64 + this.nodeCounter); // A, B, C, etc.
+                this.nodeCounter++;
+                
+                // Ensure position is within bounds
+                const margin = 40;
+                x = Math.max(margin, Math.min(560, x)); // 600 - 40
+                y = Math.max(margin, Math.min(310, y)); // 350 - 40
+                
+                this.nodes.push(nodeName);
+                this.graph[nodeName] = [];
+                this.nodePositions[nodeName] = { x, y };
+                
+                this.drawGraph();
+                this.updateInDegrees();
+                
+                document.getElementById('editorStatus').textContent = `✅ Added node ${nodeName}! Click to add more nodes.`;
+            }
+
+            handleEdgeCreation(clickedNode) {
+                if (!this.selectedNode) {
+                    // First node selection
+                    this.selectedNode = clickedNode;
+                    this.highlightNode(clickedNode, '#f59e0b'); // Orange for selected
+                    document.getElementById(`node-${clickedNode}`).classList.add('selected-node');
+                    document.getElementById('editorStatus').textContent = `Selected ${clickedNode}. Now click another node to create an edge.`;
+                } else if (this.selectedNode === clickedNode) {
+                    // Deselect same node
+                    this.clearNodeSelections();
+                    this.selectedNode = null;
+                    document.getElementById('editorStatus').textContent = '🔗 Click on two nodes to create an edge between them';
+                } else {
+                    // Second node selection - create edge
+                    const from = this.selectedNode;
+                    const to = clickedNode;
+                    
+                    // Check if edge already exists
+                    if (this.graph[from].includes(to)) {
+                        document.getElementById('editorStatus').textContent = `❌ Edge ${from}→${to} already exists!`;
+                    } else {
+                        // Check for cycle
+                        this.graph[from].push(to);
+                        this.edges.push([from, to]);
+                        
+                        if (this.hasCycle()) {
+                            // Remove the edge that creates cycle
+                            this.graph[from].pop();
+                            this.edges.pop();
+                            document.getElementById('editorStatus').textContent = `❌ Edge ${from}→${to} would create a cycle!`;
+                        } else {
+                            document.getElementById('editorStatus').textContent = `✅ Created edge ${from}→${to}!`;
+                            this.drawGraph();
+                            this.updateInDegrees();
+                        }
+                    }
+                    
+                    this.clearNodeSelections();
+                    this.selectedNode = null;
+                }
+            }
+
+            deleteNode(nodeName) {
+                // Remove node from nodes array
+                this.nodes = this.nodes.filter(n => n !== nodeName);
+                
+                // Remove all edges involving this node
+                this.edges = this.edges.filter(([from, to]) => from !== nodeName && to !== nodeName);
+                
+                // Rebuild graph
+                this.graph = {};
+                this.nodes.forEach(node => this.graph[node] = []);
+                this.edges.forEach(([from, to]) => {
+                    this.graph[from].push(to);
+                });
+                
+                // Remove position
+                delete this.nodePositions[nodeName];
+                
+                this.drawGraph();
+                this.updateInDegrees();
+                document.getElementById('editorStatus').textContent = `🗑️ Deleted node ${nodeName} and all its edges.`;
+            }
+
+            clearNodeSelections() {
+                document.querySelectorAll('.selected-node').forEach(node => {
+                    node.classList.remove('selected-node');
+                });
+                this.nodes.forEach(node => {
+                    this.highlightNode(node, '#3b82f6'); // Reset to blue
+                });
+            }
+
+            clearInteractiveGraph() {
+                this.nodes = [];
+                this.edges = [];
+                this.graph = {};
+                this.nodePositions = {};
+                this.nodeCounter = 1;
+                this.selectedNode = null;
+                this.clearCanvas();
+                this.updateInDegrees();
+                document.getElementById('editorStatus').textContent = '🧹 Graph cleared! Start adding nodes.';
+            }
+
+            finishEditing() {
+                if (this.nodes.length === 0) {
+                    alert('Please add at least one node before finishing!');
+                    return;
+                }
+                
+                this.toggleInteractiveMode();
+                document.getElementById('editorStatus').textContent = '✅ Graph created! You can now run the algorithms.';
+            }
+
+            clearCanvas() {
+                const svg = document.getElementById('graphSvg');
+                svg.innerHTML = '<text x="300" y="175" text-anchor="middle" class="text-gray-500 text-lg">Click "Add Node Mode" then click to add nodes!</text>';
+            }
+
+            generateRandomGraph() {
+                this.resetVisualization();
+                this.isInteractiveMode = false;
+                document.getElementById('interactivePanel').classList.add('hidden');
+                
+                // Generate 6 nodes
+                this.nodes = ['A', 'B', 'C', 'D', 'E', 'F'];
+                this.graph = {};
+                this.nodes.forEach(node => this.graph[node] = []);
+
+                // Generate edges ensuring DAG property
+                const edges = [
+                    ['A', 'B'], ['A', 'C'], ['B', 'D'], 
+                    ['C', 'D'], ['C', 'E'], ['D', 'F'], ['E', 'F']
+                ];
+                
+                // Randomly select some edges
+                this.edges = [];
+                edges.forEach(edge => {
+                    if (Math.random() > 0.3) {
+                        this.graph[edge[0]].push(edge[1]);
+                        this.edges.push(edge);
+                    }
+                });
+
+                this.calculateNodePositions();
+                this.drawGraph();
+                this.updateInDegrees();
+            }
+
+            loadSampleGraph(type) {
+                if (!type) return;
+                
+                this.resetVisualization();
+                this.isInteractiveMode = false;
+                document.getElementById('interactivePanel').classList.add('hidden');
+                
+                const sampleGraphs = {
+                    linear: {
+                        nodes: ['A', 'B', 'C', 'D', 'E'],
+                        edges: [['A', 'B'], ['B', 'C'], ['C', 'D'], ['D', 'E']]
+                    },
+                    tree: {
+                        nodes: ['Root', 'L1', 'R1', 'L2', 'R2', 'L3'],
+                        edges: [['Root', 'L1'], ['Root', 'R1'], ['L1', 'L2'], ['L1', 'R2'], ['R1', 'L3']]
+                    },
+                    diamond: {
+                        nodes: ['A', 'B', 'C', 'D'],
+                        edges: [['A', 'B'], ['A', 'C'], ['B', 'D'], ['C', 'D']]
+                    },
+                    complex: {
+                        nodes: ['A', 'B', 'C', 'D', 'E', 'F', 'G'],
+                        edges: [['A', 'B'], ['A', 'C'], ['B', 'D'], ['C', 'D'], ['C', 'E'], ['D', 'F'], ['E', 'F'], ['F', 'G']]
+                    },
+                    course: {
+                        nodes: ['Math101', 'CS101', 'Math201', 'CS201', 'CS301', 'CS401'],
+                        edges: [['Math101', 'Math201'], ['CS101', 'CS201'], ['Math201', 'CS301'], ['CS201', 'CS301'], ['CS301', 'CS401']]
+                    }
+                };
+
+                const selected = sampleGraphs[type];
+                this.nodes = selected.nodes;
+                this.edges = selected.edges;
+                this.graph = {};
+                
+                this.nodes.forEach(node => this.graph[node] = []);
+                this.edges.forEach(([from, to]) => {
+                    this.graph[from].push(to);
+                });
+
+                this.calculateNodePositions();
+                this.drawGraph();
+                this.updateInDegrees();
+                
+                // Reset dropdown
+                document.getElementById('sampleGraphs').value = '';
+            }
+
+            toggleCustomGraphPanel() {
+                const panel = document.getElementById('customGraphPanel');
+                panel.classList.toggle('hidden');
+                
+                if (!panel.classList.contains('hidden')) {
+                    document.getElementById('customNodes').focus();
+                }
+            }
+
+            createCustomGraph() {
+                const nodesInput = document.getElementById('customNodes').value.trim();
+                const edgesInput = document.getElementById('customEdges').value.trim();
+                
+                if (!nodesInput) {
+                    alert('Please enter at least one node!');
+                    return;
+                }
+
+                try {
+                    // Parse nodes
+                    this.nodes = nodesInput.split(',').map(n => n.trim()).filter(n => n);
+                    
+                    // Parse edges
+                    this.edges = [];
+                    if (edgesInput) {
+                        const edgeStrings = edgesInput.split(',').map(e => e.trim());
+                        edgeStrings.forEach(edgeStr => {
+                            let from, to;
+                            if (edgeStr.includes('→')) {
+                                [from, to] = edgeStr.split('→').map(n => n.trim());
+                            } else if (edgeStr.includes('-')) {
+                                [from, to] = edgeStr.split('-').map(n => n.trim());
+                            } else {
+                                throw new Error(`Invalid edge format: ${edgeStr}`);
+                            }
+                            
+                            if (!this.nodes.includes(from) || !this.nodes.includes(to)) {
+                                throw new Error(`Edge ${from}→${to} contains undefined nodes`);
+                            }
+                            
+                            this.edges.push([from, to]);
+                        });
+                    }
+
+                    // Build graph
+                    this.graph = {};
+                    this.nodes.forEach(node => this.graph[node] = []);
+                    this.edges.forEach(([from, to]) => {
+                        this.graph[from].push(to);
+                    });
+
+                    // Check for cycles (basic check)
+                    if (this.hasCycle()) {
+                        throw new Error('Graph contains cycles! Topological sort requires a DAG (Directed Acyclic Graph).');
+                    }
+
+                    this.calculateNodePositions();
+                    this.drawGraph();
+                    this.updateInDegrees();
+                    this.toggleCustomGraphPanel();
+                    
+                    // Clear inputs
+                    document.getElementById('customNodes').value = '';
+                    document.getElementById('customEdges').value = '';
+                    
+                } catch (error) {
+                    this.showError(error.message);
+                }
+            }
+
+            hasCycle() {
+                const visited = new Set();
+                const recStack = new Set();
+                
+                const dfs = (node) => {
+                    visited.add(node);
+                    recStack.add(node);
+                    
+                    for (const neighbor of this.graph[node] || []) {
+                        if (!visited.has(neighbor)) {
+                            if (dfs(neighbor)) return true;
+                        } else if (recStack.has(neighbor)) {
+                            return true;
+                        }
+                    }
+                    
+                    recStack.delete(node);
+                    return false;
+                };
+                
+                for (const node of this.nodes) {
+                    if (!visited.has(node)) {
+                        if (dfs(node)) return true;
+                    }
+                }
+                
+                return false;
+            }
+
+            calculateNodePositions() {
+                const svg = document.getElementById('graphSvg');
+                const width = 600;
+                const height = 350;
+                const margin = 60;
+
+                // Arrange nodes in a grid with better spacing
+                this.nodePositions = {};
+                const cols = Math.min(4, this.nodes.length);
+                const rows = Math.ceil(this.nodes.length / cols);
+                
+                this.nodes.forEach((node, i) => {
+                    const col = i % cols;
+                    const row = Math.floor(i / cols);
+                    this.nodePositions[node] = {
+                        x: margin + col * (width - 2 * margin) / Math.max(1, cols - 1),
+                        y: margin + row * (height - 2 * margin) / Math.max(1, rows - 1)
+                    };
+                });
+            }
+
+            drawGraph() {
+                const svg = document.getElementById('graphSvg');
+                svg.innerHTML = '';
+
+                // Draw edges
+                this.edges.forEach(([from, to]) => {
+                    const fromPos = this.nodePositions[from];
+                    const toPos = this.nodePositions[to];
+                    
+                    // Calculate arrow position
+                    const dx = toPos.x - fromPos.x;
+                    const dy = toPos.y - fromPos.y;
+                    const length = Math.sqrt(dx * dx + dy * dy);
+                    const unitX = dx / length;
+                    const unitY = dy / length;
+                    
+                    const startX = fromPos.x + unitX * 30;
+                    const startY = fromPos.y + unitY * 30;
+                    const endX = toPos.x - unitX * 30;
+                    const endY = toPos.y - unitY * 30;
+
+                    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                    line.setAttribute('x1', startX);
+                    line.setAttribute('y1', startY);
+                    line.setAttribute('x2', endX);
+                    line.setAttribute('y2', endY);
+                    line.setAttribute('stroke', '#6b7280');
+                    line.setAttribute('stroke-width', '2');
+                    line.setAttribute('marker-end', 'url(#arrowhead)');
+                    line.classList.add('edge');
+                    line.id = `edge-${from}-${to}`;
+                    svg.appendChild(line);
+                });
+
+                // Add arrowhead marker
+                const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+                const marker = document.createElementNS('http://www.w3.org/2000/svg', 'marker');
+                marker.setAttribute('id', 'arrowhead');
+                marker.setAttribute('markerWidth', '10');
+                marker.setAttribute('markerHeight', '7');
+                marker.setAttribute('refX', '9');
+                marker.setAttribute('refY', '3.5');
+                marker.setAttribute('orient', 'auto');
+                
+                const polygon = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+                polygon.setAttribute('points', '0 0, 10 3.5, 0 7');
+                polygon.setAttribute('fill', '#6b7280');
+                
+                marker.appendChild(polygon);
+                defs.appendChild(marker);
+                svg.appendChild(defs);
+
+                // Calculate in-degrees for display
+                const inDegrees = {};
+                this.nodes.forEach(node => inDegrees[node] = 0);
+                this.edges.forEach(([from, to]) => {
+                    inDegrees[to]++;
+                });
+
+                // Draw nodes
+                this.nodes.forEach(node => {
+                    const pos = this.nodePositions[node];
+                    
+                    const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                    circle.setAttribute('cx', pos.x);
+                    circle.setAttribute('cy', pos.y);
+                    circle.setAttribute('r', '30');
+                    circle.setAttribute('fill', '#3b82f6');
+                    circle.setAttribute('stroke', '#1e40af');
+                    circle.setAttribute('stroke-width', '2');
+                    circle.classList.add('node');
+                    circle.id = `node-${node}`;
+                    svg.appendChild(circle);
+
+                    // Node label
+                    const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                    text.setAttribute('x', pos.x);
+                    text.setAttribute('y', pos.y + 2);
+                    text.setAttribute('text-anchor', 'middle');
+                    text.setAttribute('fill', 'white');
+                    text.setAttribute('font-size', '14');
+                    text.setAttribute('font-weight', 'bold');
+                    text.textContent = node;
+                    svg.appendChild(text);
+
+                    // In-degree display
+                    const inDegreeText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                    inDegreeText.setAttribute('x', pos.x);
+                    inDegreeText.setAttribute('y', pos.y - 45);
+                    inDegreeText.setAttribute('text-anchor', 'middle');
+                    inDegreeText.setAttribute('fill', '#374151');
+                    inDegreeText.setAttribute('font-size', '12');
+                    inDegreeText.setAttribute('font-weight', 'bold');
+                    inDegreeText.textContent = `in: ${inDegrees[node]}`;
+                    svg.appendChild(inDegreeText);
+                });
+            }
+
+            updateInDegrees() {
+                const inDegrees = {};
+                this.nodes.forEach(node => inDegrees[node] = 0);
+                
+                this.edges.forEach(([from, to]) => {
+                    inDegrees[to]++;
+                });
+
+                const inDegreeText = this.nodes.length > 0 ? 
+                    this.nodes.map(node => `${node}: ${inDegrees[node]}`).join(', ') : 
+                    'Create a graph first';
+                document.getElementById('inDegrees').textContent = inDegreeText;
+            }
+
+            async runDFSVisualization() {
+                if (this.isRunning || this.nodes.length === 0) return;
+                this.isRunning = true;
+                this.resetNodeColors();
+
+                const visited = new Set();
+                const result = [];
+                
+                document.getElementById('dfsStatus').textContent = 'Starting DFS traversal...';
+                document.getElementById('dfsResult').textContent = '';
+
+                const dfs = async (node) => {
+                    if (visited.has(node)) return;
+                    
+                    visited.add(node);
+                    this.highlightNode(node, '#eab308'); // Yellow for processing
+                    document.getElementById('dfsStatus').textContent = `Visiting node ${node}`;
+                    
+                    await this.sleep(this.speed);
+
+                    for (const neighbor of this.graph[node] || []) {
+                        if (!visited.has(neighbor)) {
+                            this.highlightEdge(node, neighbor, '#ef4444'); // Red for active edge
+                            await this.sleep(this.speed / 2);
+                            await dfs(neighbor);
+                            this.highlightEdge(node, neighbor, '#6b7280'); // Reset edge
+                        }
+                    }
+
+                    result.push(node);
+                    this.highlightNode(node, '#22c55e'); // Green for completed
+                    document.getElementById('dfsStatus').textContent = `Completed node ${node}, added to result`;
+                    await this.sleep(this.speed);
+                };
+
+                for (const node of this.nodes) {
+                    if (!visited.has(node)) {
+                        await dfs(node);
+                    }
+                }
+
+                result.reverse();
+                document.getElementById('dfsResult').textContent = result.join(' → ');
+                document.getElementById('dfsStatus').textContent = 'DFS completed! Result shows topological order.';
+                this.isRunning = false;
+            }
+
+            async runKahnVisualization() {
+                if (this.isRunning || this.nodes.length === 0) return;
+                this.isRunning = true;
+                this.resetNodeColors();
+
+                const inDegree = {};
+                this.nodes.forEach(node => inDegree[node] = 0);
+                
+                this.edges.forEach(([from, to]) => {
+                    inDegree[to]++;
+                });
+
+                const queue = [];
+                const result = [];
+                const removedNodes = new Set();
+
+                // Find nodes with in-degree 0
+                this.nodes.forEach(node => {
+                    if (inDegree[node] === 0) {
+                        queue.push(node);
+                        this.highlightNode(node, '#eab308'); // Yellow for ready
+                    }
+                });
+
+                document.getElementById('kahnStatus').textContent = `Queue initialized with nodes: ${queue.join(', ')}`;
+                await this.sleep(this.speed);
+
+                while (queue.length > 0) {
+                    const current = queue.shift();
+                    result.push(current);
+                    
+                    this.highlightNode(current, '#22c55e'); // Green for processed
+                    document.getElementById('kahnStatus').textContent = `Processing node ${current}`;
+                    document.getElementById('kahnResult').textContent = result.join(' → ');
+                    
+                    await this.sleep(this.speed);
+
+                    // Update neighbors and remove edges
+                    for (const neighbor of this.graph[current] || []) {
+                        this.highlightEdge(current, neighbor, '#ef4444');
+                        inDegree[neighbor]--;
+                        
+                        if (inDegree[neighbor] === 0) {
+                            queue.push(neighbor);
+                            this.highlightNode(neighbor, '#eab308');
+                            document.getElementById('kahnStatus').textContent = `Node ${neighbor} added to queue (in-degree = 0)`;
+                        }
+                        
+                        await this.sleep(this.speed / 2);
+                        
+                        // Remove the edge visually
+                        const edge = document.getElementById(`edge-${current}-${neighbor}`);
+                        if (edge) {
+                            edge.style.opacity = '0';
+                        }
+                    }
+                    
+                    // Remove the vertex visually
+                    removedNodes.add(current);
+                    const nodeElement = document.getElementById(`node-${current}`);
+                    if (nodeElement) {
+                        nodeElement.style.opacity = '0.3';
+                        nodeElement.style.transform = 'scale(0.5)';
+                    }
+                    
+                    // Also fade the node text
+                    const nodeTexts = document.querySelectorAll(`text`);
+                    nodeTexts.forEach(text => {
+                        if (text.textContent === current) {
+                            text.style.opacity = '0.3';
+                        }
+                    });
+                    
+                    document.getElementById('kahnStatus').textContent = `Removed vertex ${current} and all its outgoing edges`;
+                    await this.sleep(this.speed / 2);
+                }
+
+                document.getElementById('kahnStatus').textContent = 'Kahn\'s algorithm completed! All vertices removed.';
+                this.isRunning = false;
+            }
+
+            stepDFSVisualization() {
+                if (this.isRunning || this.nodes.length === 0) return;
+                
+                if (!this.dfsState) {
+                    // Initialize DFS state
+                    this.resetNodeColors();
+                    this.dfsState = {
+                        visited: new Set(),
+                        result: [],
+                        stack: [...this.nodes.filter(node => !this.dfsState?.visited?.has(node) || true)],
+                        currentNode: null,
+                        phase: 'start',
+                        nodeIndex: 0
+                    };
+                    document.getElementById('dfsStatus').textContent = 'DFS initialized. Click "Step DFS" to proceed.';
+                    document.getElementById('dfsResult').textContent = '';
+                    return;
+                }
+
+                const state = this.dfsState;
+                
+                if (state.phase === 'start') {
+                    // Find next unvisited node
+                    while (state.nodeIndex < this.nodes.length && state.visited.has(this.nodes[state.nodeIndex])) {
+                        state.nodeIndex++;
+                    }
+                    
+                    if (state.nodeIndex >= this.nodes.length) {
+                        // All nodes visited, reverse result
+                        state.result.reverse();
+                        document.getElementById('dfsResult').textContent = state.result.join(' → ');
+                        document.getElementById('dfsStatus').textContent = 'DFS completed! Result shows topological order.';
+                        this.dfsState = null;
+                        return;
+                    }
+                    
+                    state.currentNode = this.nodes[state.nodeIndex];
+                    state.visited.add(state.currentNode);
+                    this.highlightNode(state.currentNode, '#eab308');
+                    document.getElementById('dfsStatus').textContent = `Visiting node ${state.currentNode}`;
+                    state.phase = 'explore';
+                    state.neighborIndex = 0;
+                } else if (state.phase === 'explore') {
+                    const neighbors = this.graph[state.currentNode] || [];
+                    
+                    if (state.neighborIndex < neighbors.length) {
+                        const neighbor = neighbors[state.neighborIndex];
+                        if (!state.visited.has(neighbor)) {
+                            this.highlightEdge(state.currentNode, neighbor, '#ef4444');
+                            document.getElementById('dfsStatus').textContent = `Exploring edge ${state.currentNode} → ${neighbor}`;
+                            // Set up for recursive call
+                            state.stack.push({node: state.currentNode, neighborIndex: state.neighborIndex + 1});
+                            state.currentNode = neighbor;
+                            state.visited.add(neighbor);
+                            this.highlightNode(neighbor, '#eab308');
+                            state.neighborIndex = 0;
+                        } else {
+                            state.neighborIndex++;
+                        }
+                    } else {
+                        // Done with current node
+                        state.result.push(state.currentNode);
+                        this.highlightNode(state.currentNode, '#22c55e');
+                        document.getElementById('dfsStatus').textContent = `Completed node ${state.currentNode}, added to result`;
+                        
+                        // Backtrack
+                        if (state.stack.length > 0) {
+                            const prev = state.stack.pop();
+                            if (typeof prev === 'object') {
+                                state.currentNode = prev.node;
+                                state.neighborIndex = prev.neighborIndex;
+                            } else {
+                                state.phase = 'start';
+                                state.nodeIndex++;
+                            }
+                        } else {
+                            state.phase = 'start';
+                            state.nodeIndex++;
+                        }
+                    }
+                }
+            }
+
+            stepKahnVisualization() {
+                if (this.isRunning || this.nodes.length === 0) return;
+                
+                if (!this.kahnState) {
+                    // Initialize Kahn's state
+                    this.resetNodeColors();
+                    const inDegree = {};
+                    this.nodes.forEach(node => inDegree[node] = 0);
+                    this.edges.forEach(([from, to]) => {
+                        inDegree[to]++;
+                    });
+                    
+                    const queue = [];
+                    this.nodes.forEach(node => {
+                        if (inDegree[node] === 0) {
+                            queue.push(node);
+                            this.highlightNode(node, '#eab308');
+                        }
+                    });
+                    
+                    this.kahnState = {
+                        inDegree: inDegree,
+                        queue: queue,
+                        result: [],
+                        removedNodes: new Set(),
+                        phase: 'init'
+                    };
+                    
+                    document.getElementById('kahnStatus').textContent = `Kahn's initialized. Queue: ${queue.join(', ')}`;
+                    document.getElementById('kahnResult').textContent = '';
+                    return;
+                }
+
+                const state = this.kahnState;
+                
+                if (state.queue.length === 0) {
+                    document.getElementById('kahnStatus').textContent = 'Kahn\'s algorithm completed! All vertices removed.';
+                    this.kahnState = null;
+                    return;
+                }
+                
+                const current = state.queue.shift();
+                state.result.push(current);
+                
+                this.highlightNode(current, '#22c55e');
+                document.getElementById('kahnStatus').textContent = `Processing node ${current}`;
+                document.getElementById('kahnResult').textContent = state.result.join(' → ');
+                
+                // Update neighbors and remove edges
+                for (const neighbor of this.graph[current] || []) {
+                    this.highlightEdge(current, neighbor, '#ef4444');
+                    state.inDegree[neighbor]--;
+                    
+                    if (state.inDegree[neighbor] === 0) {
+                        state.queue.push(neighbor);
+                        this.highlightNode(neighbor, '#eab308');
+                        document.getElementById('kahnStatus').textContent = `Node ${neighbor} added to queue (in-degree = 0)`;
+                    }
+                    
+                    // Remove the edge visually
+                    setTimeout(() => {
+                        const edge = document.getElementById(`edge-${current}-${neighbor}`);
+                        if (edge) {
+                            edge.style.opacity = '0';
+                        }
+                    }, 200);
+                }
+                
+                // Remove the vertex visually
+                setTimeout(() => {
+                    state.removedNodes.add(current);
+                    const nodeElement = document.getElementById(`node-${current}`);
+                    if (nodeElement) {
+                        nodeElement.style.opacity = '0.3';
+                        nodeElement.style.transform = 'scale(0.5)';
+                    }
+                    
+                    // Also fade the node text
+                    const nodeTexts = document.querySelectorAll(`text`);
+                    nodeTexts.forEach(text => {
+                        if (text.textContent === current) {
+                            text.style.opacity = '0.3';
+                        }
+                    });
+                    
+                    document.getElementById('kahnStatus').textContent = `Removed vertex ${current} and all its outgoing edges`;
+                }, 400);
+            }
+
+            highlightNode(nodeId, color) {
+                const node = document.getElementById(`node-${nodeId}`);
+                if (node) {
+                    node.setAttribute('fill', color);
+                }
+            }
+
+            highlightEdge(from, to, color) {
+                const edge = document.getElementById(`edge-${from}-${to}`);
+                if (edge) {
+                    edge.setAttribute('stroke', color);
+                    edge.setAttribute('stroke-width', '3');
+                }
+            }
+
+            resetNodeColors() {
+                this.nodes.forEach(node => {
+                    this.highlightNode(node, '#3b82f6');
+                });
+                this.edges.forEach(([from, to]) => {
+                    this.highlightEdge(from, to, '#6b7280');
+                    const edge = document.getElementById(`edge-${from}-${to}`);
+                    if (edge) edge.setAttribute('stroke-width', '2');
+                });
+            }
+
+            resetVisualization() {
+                this.isRunning = false;
+                this.dfsState = null;
+                this.kahnState = null;
+                document.getElementById('dfsResult').textContent = this.nodes.length > 0 ? 'Click "Run DFS Algorithm" to see result' : 'Create a graph first, then run DFS algorithm';
+                document.getElementById('kahnResult').textContent = this.nodes.length > 0 ? 'Click "Run Kahn\'s Algorithm" to see result' : 'Create a graph first, then run Kahn\'s algorithm';
+                document.getElementById('dfsStatus').textContent = 'Ready to start';
+                document.getElementById('kahnStatus').textContent = 'Ready to start';
+                this.resetNodeColors();
+            }
+
+            showError(message) {
+                const errorDiv = document.getElementById('errorMessage');
+                const errorText = document.getElementById('errorText');
+                errorText.textContent = message;
+                errorDiv.classList.remove('hidden');
+                
+                // Auto-hide after 5 seconds
+                setTimeout(() => {
+                    errorDiv.classList.add('hidden');
+                }, 5000);
+            }
+
+            sleep(ms) {
+                return new Promise(resolve => setTimeout(resolve, ms));
+            }
+        }
+
+        // Initialize the visualizer when the page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            new TopologicalSortVisualizer();
+        });
+    </script>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'97bc2939f3b23b34',t:'MTc1NzMxMDU1MC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
+
